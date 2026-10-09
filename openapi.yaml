@@ -1,0 +1,279 @@
+openapi: 3.0.3
+info:
+  title: Cajero automático · Servidor ATM (Nodo 3)
+  version: 1.0.0
+  description: |
+    API del cajero automático (Express). Aplica primero su lógica local (billetes, límites y
+    efectivo disponible en el cajero) y solo después envía la transacción al Banco Central
+    (Supabase) con el API Key del cajero.
+servers:
+  - url: https://examen2-tawd-nodo3.onrender.com
+    description: Producción (Render)
+  - url: http://localhost:3001
+    description: Local
+tags:
+  - name: Cajero
+    description: Operaciones de los clientes. No requieren sesión.
+  - name: Administración
+    description: Panel de configuración del cajero. Requieren sesión de administrador.
+paths:
+  /api/salud:
+    get:
+      summary: Comprobación de vida
+      responses:
+        '200':
+          description: El servidor responde
+          content:
+            application/json:
+              schema: { type: object, properties: { ok: { type: boolean } } }
+  /api/cajero:
+    get:
+      tags: [Cajero]
+      summary: Estado del cajero y reglas locales
+      responses:
+        '200':
+          description: Estado del cajero
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  en_servicio: { type: boolean }
+                  motivo: { type: string, description: Presente si está fuera de servicio }
+                  nombre: { type: string, example: ATM 01 }
+                  reglas: { $ref: '#/components/schemas/Reglas' }
+  /api/cajero/saldo:
+    post:
+      tags: [Cajero]
+      summary: Consultar el saldo de una cuenta en el Banco Central
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [numero_cuenta]
+              properties:
+                numero_cuenta: { type: string, pattern: '^\d{4,20}$', example: '6976023998' }
+      responses:
+        '200':
+          description: Datos de la cuenta
+          content: { application/json: { schema: { $ref: '#/components/schemas/Cuenta' } } }
+        '400': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+  /api/cajero/retiro:
+    post:
+      tags: [Cajero]
+      summary: Retirar efectivo
+      description: |
+        Pasos de autorización:
+        1. Cajero: el monto es múltiplo de la denominación y no supera el límite por retiro.
+        2. Cajero: hay efectivo suficiente en este cajero.
+        3. Banco Central: la cuenta está activa y tiene fondos.
+        4. Banco Central: se ejecuta el retiro de forma atómica.
+
+        Si falla el paso 1 o 2 no se envía ninguna transacción al banco.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Operacion' }
+      responses:
+        '200':
+          description: Retiro autorizado
+          content: { application/json: { schema: { $ref: '#/components/schemas/Comprobante' } } }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409':
+          description: Sin fondos en la cuenta o sin efectivo en el cajero
+          content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+        '422':
+          description: Monto rechazado por las reglas locales del cajero
+          content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+        '503': { $ref: '#/components/responses/Error' }
+  /api/cajero/deposito:
+    post:
+      tags: [Cajero]
+      summary: Abonar a una cuenta
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Operacion' }
+      responses:
+        '200':
+          description: Depósito registrado
+          content: { application/json: { schema: { $ref: '#/components/schemas/Comprobante' } } }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '422':
+          description: Monto rechazado por las reglas locales del cajero
+          content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+        '503': { $ref: '#/components/responses/Error' }
+  /api/admin/login:
+    post:
+      tags: [Administración]
+      summary: Iniciar sesión como administrador del cajero
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [usuario, password]
+              properties:
+                usuario: { type: string, example: admin }
+                password: { type: string, format: password }
+      responses:
+        '200':
+          description: Sesión iniciada; se envía la cookie `atm_admin`
+          content:
+            application/json:
+              schema: { type: object, properties: { usuario: { type: string } } }
+        '401': { $ref: '#/components/responses/Error' }
+  /api/admin/logout:
+    post:
+      tags: [Administración]
+      summary: Cerrar sesión
+      responses:
+        '200': { description: Sesión cerrada }
+  /api/admin/estado:
+    get:
+      tags: [Administración]
+      summary: Configuración vigente, datos del cajero y últimos movimientos
+      security: [{ SesionAdmin: [] }]
+      responses:
+        '200':
+          description: Estado del cajero
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  usuario: { type: string }
+                  origen:
+                    type: string
+                    enum: [terminal, entorno, ninguno]
+                    description: De dónde sale el API Key vigente
+                  api_key: { type: string, description: Solo el prefijo, example: bk_atm_1a2b3… }
+                  reglas: { $ref: '#/components/schemas/Reglas' }
+                  nodo:
+                    type: object
+                    properties:
+                      id: { type: string, format: uuid }
+                      tipo: { type: string, enum: [sucursal, cajero] }
+                      nombre: { type: string }
+                      responsable: { type: string, nullable: true }
+                      efectivo_disponible: { type: number }
+                      estado: { type: string, enum: [activo, inactivo] }
+                  movimientos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: integer }
+                        tipo: { type: string, enum: [retiro, deposito, transferencia] }
+                        monto: { type: number }
+                        cuenta_origen: { type: string, nullable: true }
+                        cuenta_destino: { type: string, nullable: true }
+                        timestamp: { type: string, format: date-time }
+                  error: { type: string }
+        '401': { $ref: '#/components/responses/Error' }
+  /api/admin/config:
+    put:
+      tags: [Administración]
+      summary: Guardar el API Key y las reglas locales del cajero
+      description: |
+        El API Key se verifica contra el Banco Central (se rechaza si es de una sucursal) y la
+        configuración se guarda cifrada (AES-256-GCM) en la cookie `atm_config` de esta terminal.
+      security: [{ SesionAdmin: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                api_key: { type: string, example: bk_atm_1a2b3c... }
+                multiplo: { type: integer, minimum: 1, example: 100 }
+                retiro_maximo: { type: integer, minimum: 1, example: 8000 }
+                deposito_maximo: { type: integer, minimum: 1, example: 20000 }
+      responses:
+        '200': { description: Configuración guardada }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Administración]
+      summary: Quitar la configuración de esta terminal
+      description: El cajero vuelve a usar las variables de entorno.
+      security: [{ SesionAdmin: [] }]
+      responses:
+        '200': { description: Configuración eliminada }
+        '401': { $ref: '#/components/responses/Error' }
+components:
+  securitySchemes:
+    SesionAdmin:
+      type: apiKey
+      in: cookie
+      name: atm_admin
+      description: Cookie firmada que entrega /api/admin/login.
+  responses:
+    Error:
+      description: |
+        Error. `rechazado_por` indica quién detuvo la operación: `cajero` (lógica local) o
+        `banco` (Banco Central).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+  schemas:
+    Error:
+      type: object
+      properties:
+        error: { type: string, example: Este cajero solo entrega múltiplos de $100. }
+        rechazado_por: { type: string, enum: [cajero, banco] }
+        codigo: { type: string, example: CUENTA_NO_ENCONTRADA }
+        pasos:
+          type: array
+          items: { $ref: '#/components/schemas/Paso' }
+    Reglas:
+      type: object
+      properties:
+        multiplo: { type: integer, example: 100, description: Denominación mínima de retiro }
+        retiro_maximo: { type: integer, example: 8000 }
+        deposito_maximo: { type: integer, example: 20000 }
+        deposito_multiplo: { type: integer, example: 50 }
+    Cuenta:
+      type: object
+      properties:
+        numero_cuenta: { type: string, example: '6976023998' }
+        nombre_titular: { type: string }
+        saldo: { type: number }
+        estado: { type: string, enum: [activa, bloqueada] }
+    Operacion:
+      type: object
+      required: [numero_cuenta, monto]
+      properties:
+        numero_cuenta: { type: string, pattern: '^\d{4,20}$', example: '6976023998' }
+        monto: { type: integer, minimum: 1, example: 300 }
+    Paso:
+      type: object
+      properties:
+        donde: { type: string, enum: [cajero, banco] }
+        texto: { type: string, example: El cajero tiene efectivo suficiente. }
+    Comprobante:
+      type: object
+      properties:
+        transaccion_id: { type: integer, example: 8 }
+        tipo: { type: string, enum: [retiro, deposito] }
+        numero_cuenta: { type: string }
+        nombre_titular: { type: string }
+        monto: { type: number, example: 300 }
+        saldo: { type: number, example: 700 }
+        cajero: { type: string, example: ATM 01 }
+        fecha: { type: string, format: date-time }
+        pasos:
+          type: array
+          items: { $ref: '#/components/schemas/Paso' }
