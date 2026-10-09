@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cajero automático</title>
+  <link rel="stylesheet" href="/estilos.css">
+</head>
+<body class="atm">
+  <div class="carcasa">
+    <div class="marquesina">
+      <strong id="nombre-cajero">Cajero automático</strong>
+      <span><span class="luz" id="luz"></span><span id="estado">Conectando…</span></span>
+    </div>
+
+    <div class="pantalla">
+      <!-- Fuera de servicio -->
+      <section id="p-fuera" hidden>
+        <h1>Cajero fuera de servicio</h1>
+        <p id="motivo-fuera"></p>
+        <div class="espacio"></div>
+        <button class="tecla ancha" type="button" id="reintentar">Reintentar</button>
+      </section>
+
+      <!-- Bienvenida -->
+      <section id="p-inicio" hidden>
+        <h1>Bienvenido</h1>
+        <p>Escribe tu número de cuenta para comenzar.</p>
+        <div class="mensaje error" id="error-inicio" hidden></div>
+        <form id="form-inicio">
+          <div class="campo-atm">
+            <label for="cuenta">Número de cuenta</label>
+            <input id="cuenta" inputmode="numeric" pattern="[0-9]{4,20}" maxlength="20" autocomplete="off" required>
+          </div>
+          <div class="fila-teclas">
+            <button class="tecla principal" type="submit">Continuar</button>
+          </div>
+        </form>
+      </section>
+
+      <!-- Menú -->
+      <section id="p-menu" hidden>
+        <h1 id="saludo">Hola</h1>
+        <p>¿Qué deseas hacer?</p>
+        <div class="opciones">
+          <button class="tecla" type="button" data-ir="saldo">Consultar saldo</button>
+          <button class="tecla" type="button" data-ir="retiro">Retirar efectivo</button>
+          <button class="tecla" type="button" data-ir="deposito">Depositar</button>
+          <button class="tecla" type="button" data-ir="salir">Salir</button>
+        </div>
+      </section>
+
+      <!-- Saldo -->
+      <section id="p-saldo" hidden>
+        <h1>Saldo disponible</h1>
+        <p id="saldo-cuenta"></p>
+        <div class="saldo-grande" id="saldo-valor"></div>
+        <div class="espacio"></div>
+        <div class="fila-teclas">
+          <button class="tecla" type="button" data-ir="menu">Otra operación</button>
+          <button class="tecla" type="button" data-ir="salir">Salir</button>
+        </div>
+      </section>
+
+      <!-- Retiro / depósito -->
+      <section id="p-monto" hidden>
+        <h1 id="monto-titulo"></h1>
+        <p id="monto-ayuda"></p>
+        <div class="mensaje error" id="error-monto" hidden></div>
+        <div class="opciones" id="montos-rapidos"></div>
+        <form id="form-monto" style="margin-top:14px">
+          <div class="campo-atm">
+            <label for="monto">Otra cantidad</label>
+            <input id="monto" inputmode="numeric" pattern="[0-9]{1,7}" maxlength="7" autocomplete="off" required>
+          </div>
+          <div class="fila-teclas">
+            <button class="tecla" type="button" data-ir="menu">Cancelar</button>
+            <button class="tecla principal" type="submit">Aceptar</button>
+          </div>
+        </form>
+      </section>
+
+      <!-- Comprobante -->
+      <section id="p-recibo" hidden>
+        <h1 id="recibo-titulo"></h1>
+        <p id="recibo-sub"></p>
+        <div class="recibo" id="recibo"></div>
+        <ul class="pasos" id="pasos"></ul>
+        <div class="espacio"></div>
+        <div class="fila-teclas">
+          <button class="tecla" type="button" data-ir="menu">Otra operación</button>
+          <button class="tecla" type="button" data-ir="salir">Salir</button>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div class="pie-atm"><a href="/admin">Panel administrativo</a></div>
+
+  <script src="/cajero.js"></script>
+</body>
+</html>

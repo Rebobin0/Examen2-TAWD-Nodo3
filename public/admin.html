@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Panel del cajero</title>
+  <link rel="stylesheet" href="/estilos.css">
+</head>
+<body class="admin">
+  <header class="barra">
+    <div class="barra-int">
+      <strong><span id="nombre">Cajero automático</span><small>Panel administrativo</small></strong>
+      <div class="derecha">
+        <a href="/">Ir al cajero</a>
+        <span id="usuario"></span>
+        <button id="salir" type="button" hidden>Salir</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div id="aviso" class="aviso" hidden></div>
+
+    <!-- Login -->
+    <section id="v-login" class="login" hidden>
+      <h1>Acceso del administrador</h1>
+      <p class="sub">Configuración del cajero automático.</p>
+      <form id="form-login" class="panel">
+        <div class="campo">
+          <label for="l-usuario">Usuario</label>
+          <input id="l-usuario" required autocomplete="username">
+        </div>
+        <div class="campo">
+          <label for="l-password">Contraseña</label>
+          <input id="l-password" type="password" required autocomplete="current-password">
+        </div>
+        <button class="btn" type="submit">Entrar</button>
+      </form>
+    </section>
+
+    <!-- Panel -->
+    <section id="v-panel" hidden>
+      <h1>Configuración del cajero</h1>
+      <p class="sub">El cajero se identifica ante el Banco Central con su API Key.</p>
+
+      <div id="estado"></div>
+      <div class="tarjetas" id="tarjetas"></div>
+
+      <form id="form-key" class="panel">
+        <h2>API Key del cajero</h2>
+        <div class="campo">
+          <label for="api_key">Nuevo API Key</label>
+          <input id="api_key" class="mono" type="password" autocomplete="off" placeholder="bk_atm_…" required>
+          <div class="ayuda">Se verifica contra el Banco Central y se guarda cifrado en esta terminal. No se vuelve a mostrar.</div>
+        </div>
+        <div class="pie-form">
+          <button class="btn" type="submit">Verificar y guardar</button>
+          <button class="btn sec" type="button" id="borrar">Quitar configuración de esta terminal</button>
+        </div>
+      </form>
+
+      <form id="form-reglas" class="panel">
+        <h2>Reglas locales del cajero</h2>
+        <div class="campos">
+          <div class="campo">
+            <label for="multiplo">Denominación mínima ($)</label>
+            <input id="multiplo" type="number" min="1" step="1" required>
+            <div class="ayuda">Los retiros deben ser múltiplos de este valor.</div>
+          </div>
+          <div class="campo">
+            <label for="retiro_maximo">Retiro máximo ($)</label>
+            <input id="retiro_maximo" type="number" min="1" step="1" required>
+          </div>
+          <div class="campo">
+            <label for="deposito_maximo">Depósito máximo ($)</label>
+            <input id="deposito_maximo" type="number" min="1" step="1" required>
+          </div>
+        </div>
+        <div class="pie-form">
+          <button class="btn" type="submit">Guardar reglas</button>
+        </div>
+      </form>
+
+      <div class="panel sin-relleno">
+        <h2>Últimos movimientos en este cajero</h2>
+        <div id="movimientos"></div>
+      </div>
+    </section>
+  </main>
+
+  <script src="/admin.js"></script>
+</body>
+</html>
